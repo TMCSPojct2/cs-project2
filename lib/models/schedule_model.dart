@@ -1,3 +1,6 @@
+import 'package:json_annotation/json_annotation.dart';
+part 'schedule_model.g.dart';
+
 class ClassSession {
   final String id;
   final String courseName;
@@ -20,6 +23,9 @@ class ClassSession {
     required this.endTime,
     required this.creditHours,
   });
+
+  factory ClassSession.fromJson(Map<String, dynamic> json) => _$ClassSessionFromJson(json);
+  Map<String, dynamic> toJson() => _$ClassSessionToJson(this);
 
   String get dayName {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

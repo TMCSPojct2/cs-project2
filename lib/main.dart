@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'services/supabase_service.dart';
 import 'screens/splash_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.initialize();
   runApp(const NabihApp());
 }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'home_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,6 +30,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _controller, curve: const Interval(0.2, 0.8, curve: Curves.easeOut)),
     );
     _controller.forward();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    await Future.delayed(const Duration(milliseconds: 2000));
+    if (!mounted) return;
+    if (AuthService.isLoggedIn) {
+      final profile = await AuthService.getProfile();
+      if (profile != null && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => HomeShell(profile: profile)),
+        );
+        return;
+      }
+    }
   }
 
   @override

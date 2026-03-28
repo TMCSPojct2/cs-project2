@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
-import '../models/user_model.dart';
 import 'dashboard_screen.dart';
 import 'navigation_screen.dart';
 import 'events_screen.dart';
@@ -8,8 +7,8 @@ import 'notifications_screen.dart';
 import 'profile_screen.dart';
 
 class HomeShell extends StatefulWidget {
-  final AppUser user;
-  const HomeShell({super.key, required this.user});
+  final Map<String, dynamic> profile;
+  const HomeShell({super.key, required this.profile});
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -24,11 +23,11 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _screens = [
-      DashboardScreen(user: widget.user),
+      DashboardScreen(profile: widget.profile),
       const NavigationScreen(),
-      EventsScreen(user: widget.user),
-      NotificationsScreen(user: widget.user),
-      ProfileScreen(user: widget.user),
+      EventsScreen(profile: widget.profile),
+      NotificationsScreen(profile: widget.profile),
+      ProfileScreen(profile: widget.profile),
     ];
   }
 

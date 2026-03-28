@@ -1,3 +1,7 @@
+import 'package:json_annotation/json_annotation.dart';
+part 'announcement_model.g.dart';
+
+@JsonSerializable()
 class Announcement {
   final String id;
   final String title;
@@ -5,6 +9,7 @@ class Announcement {
   final DateTime date;
   final String author;
   final String target;
+  @JsonKey(name: 'is_pinned')
   final bool isPinned;
 
   const Announcement({
@@ -16,4 +21,7 @@ class Announcement {
     required this.target,
     this.isPinned = false,
   });
+
+  factory Announcement.fromJson(Map<String, dynamic> json) => _$AnnouncementFromJson(json);
+  Map<String, dynamic> toJson() => _$AnnouncementToJson(this);
 }

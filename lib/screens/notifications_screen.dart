@@ -1,29 +1,76 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
-import '../models/user_model.dart';
-import '../models/notification_model.dart';
-import '../data/demo_data.dart';
+import '../services/database_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  final AppUser user;
-  const NotificationsScreen({super.key, required this.user});
+  final Map<String, dynamic> profile;
+  const NotificationsScreen({super.key, required this.profile});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  late List<AppNotification> _notifications;
+  List<Map<String, dynamic>> _notifications = [];
+  Set<String> _readIds = {};
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _notifications = DemoData.notifications;
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final data = await DatabaseService.getNotifications();
+      final readIds = await DatabaseService.getReadNotificationIds();
+      setState(() {
+        _notifications = data;
+        _readIds = readIds;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load notifications: $e'), backgroundColor: NabihTheme.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _markAsRead(String id) async {
+    if (_readIds.contains(id)) return;
+    try {
+      await DatabaseService.markNotificationRead(id);
+      setState(() => _readIds.add(id));
+    } catch (_) {}
+  }
+
+  Future<void> _markAllRead() async {
+    try {
+      await DatabaseService.markAllNotificationsRead();
+      setState(() {
+        for (final n in _notifications) {
+          _readIds.add(n['id'].toString());
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: NabihTheme.error),
+        );
+      }
+    }
   }
 
   void _sendNotification() {
-    final msgCtrl = TextEditingController();
     final titleCtrl = TextEditingController();
+    final msgCtrl = TextEditingController();
+    String type = 'class';
+    String? targetRole = 'student';
 
     showModalBottomSheet(
       context: context,
@@ -37,31 +84,46 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           children: [
             const Text('Send Notification', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('Send to all students in your class', style: TextStyle(fontSize: 13, color: NabihTheme.textSecondary)),
+            const Text('Send to students', style: TextStyle(fontSize: 13, color: NabihTheme.textSecondary)),
             const SizedBox(height: 16),
             TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title')),
             const SizedBox(height: 12),
             TextField(controller: msgCtrl, decoration: const InputDecoration(labelText: 'Message'), maxLines: 3),
+            const SizedBox(height: 12),
+            StatefulBuilder(builder: (context, setLocal) {
+              return DropdownButtonFormField<String>(
+                value: type,
+                decoration: const InputDecoration(labelText: 'Type'),
+                items: ['class', 'event', 'announcement', 'general'].map(
+                  (t) => DropdownMenuItem(value: t, child: Text(t)),
+                ).toList(),
+                onChanged: (v) => setLocal(() => type = v!),
+              );
+            }),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   if (titleCtrl.text.trim().isEmpty || msgCtrl.text.trim().isEmpty) return;
-                  setState(() {
-                    _notifications.insert(0, AppNotification(
-                      id: 'n_${DateTime.now().millisecondsSinceEpoch}',
+                  try {
+                    await DatabaseService.sendNotification(
                       title: titleCtrl.text.trim(),
                       message: msgCtrl.text.trim(),
-                      date: DateTime.now(),
-                      sender: widget.user.name,
-                      type: 'class',
-                    ));
-                  });
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notification sent to students!'), backgroundColor: NabihTheme.success),
-                  );
+                      senderName: widget.profile['name'] ?? 'Unknown',
+                      type: type,
+                      targetRole: targetRole,
+                    );
+                    if (mounted) Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Notification sent!'), backgroundColor: NabihTheme.success),
+                    );
+                    _loadNotifications();
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to send: $e'), backgroundColor: NabihTheme.error),
+                    );
+                  }
                 },
                 icon: const Icon(Icons.send),
                 label: const Text('Send'),
@@ -73,7 +135,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  IconData _typeIcon(String type) {
+  IconData _typeIcon(String? type) {
     switch (type) {
       case 'class': return Icons.class_rounded;
       case 'event': return Icons.event;
@@ -82,7 +144,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  Color _typeColor(String type) {
+  Color _typeColor(String? type) {
     switch (type) {
       case 'class': return NabihTheme.secondary;
       case 'event': return NabihTheme.primary;
@@ -101,8 +163,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canSend = widget.user.role == UserRole.faculty;
-    final unreadCount = _notifications.where((n) => !n.isRead).length;
+    final canSend = widget.profile['role'] == 'faculty';
+    final unreadCount = _notifications.where((n) => !_readIds.contains(n['id'].toString())).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -111,62 +173,75 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         actions: [
           if (unreadCount > 0)
             TextButton(
-              onPressed: () => setState(() {
-                for (final n in _notifications) { n.isRead = true; }
-              }),
+              onPressed: _markAllRead,
               child: const Text('Mark all read', style: TextStyle(color: Colors.white, fontSize: 13)),
             ),
         ],
       ),
-      body: _notifications.isEmpty
-          ? const Center(child: Text('No notifications'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _notifications.length,
-              itemBuilder: (context, i) {
-                final n = _notifications[i];
-                return Card(
-                  color: n.isRead ? null : NabihTheme.primary.withValues(alpha: 0.04),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    onTap: () => setState(() => n.isRead = true),
-                    leading: Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                        color: _typeColor(n.type).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(_typeIcon(n.type), color: _typeColor(n.type), size: 20),
-                    ),
-                    title: Row(
-                      children: [
-                        if (!n.isRead)
-                          Container(
-                            width: 8, height: 8,
-                            margin: const EdgeInsets.only(right: 6),
-                            decoration: const BoxDecoration(color: NabihTheme.primary, shape: BoxShape.circle),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadNotifications,
+              child: _notifications.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 200),
+                        Center(child: Text('No notifications')),
+                      ],
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _notifications.length,
+                      itemBuilder: (context, i) {
+                        final n = _notifications[i];
+                        final id = n['id'].toString();
+                        final isRead = _readIds.contains(id);
+                        final createdAt = DateTime.tryParse(n['created_at'] ?? '');
+                        final timeStr = createdAt != null ? _timeAgo(createdAt) : '';
+
+                        return Card(
+                          color: isRead ? null : NabihTheme.primary.withValues(alpha: 0.04),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            onTap: () => _markAsRead(id),
+                            leading: Container(
+                              width: 42, height: 42,
+                              decoration: BoxDecoration(
+                                color: _typeColor(n['type']).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(_typeIcon(n['type']), color: _typeColor(n['type']), size: 20),
+                            ),
+                            title: Row(
+                              children: [
+                                if (!isRead)
+                                  Container(
+                                    width: 8, height: 8,
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: const BoxDecoration(color: NabihTheme.primary, shape: BoxShape.circle),
+                                  ),
+                                Expanded(child: Text(n['title'] ?? '', style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.w600, fontSize: 14))),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(n['message'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: NabihTheme.textSecondary)),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Text(n['sender_name'] ?? '', style: const TextStyle(fontSize: 11, color: NabihTheme.textLight)),
+                                    const Spacer(),
+                                    Text(timeStr, style: const TextStyle(fontSize: 11, color: NabihTheme.textLight)),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        Expanded(child: Text(n.title, style: TextStyle(fontWeight: n.isRead ? FontWeight.normal : FontWeight.w600, fontSize: 14))),
-                      ],
+                        );
+                      },
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(n.message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: NabihTheme.textSecondary)),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text(n.sender, style: const TextStyle(fontSize: 11, color: NabihTheme.textLight)),
-                            const Spacer(),
-                            Text(_timeAgo(n.date), style: const TextStyle(fontSize: 11, color: NabihTheme.textLight)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
             ),
       floatingActionButton: canSend
           ? FloatingActionButton.extended(

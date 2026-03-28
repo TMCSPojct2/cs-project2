@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
-import '../data/demo_data.dart';
+import '../services/database_service.dart';
 
 class GpaCalculatorScreen extends StatefulWidget {
   const GpaCalculatorScreen({super.key});
@@ -10,12 +10,43 @@ class GpaCalculatorScreen extends StatefulWidget {
 }
 
 class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
-  final List<_CourseEntry> _courses = [
-    _CourseEntry(),
-    _CourseEntry(),
-    _CourseEntry(),
-  ];
+  static const Map<String, double> gradePoints = {
+    'A+': 5.0, 'A': 4.75, 'B+': 4.5, 'B': 4.0,
+    'C+': 3.5, 'C': 3.0, 'D+': 2.5, 'D': 2.0, 'F': 1.0,
+  };
+  static const List<String> gradeOptions = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'F'];
+  static const List<int> creditOptions = [1, 2, 3, 4];
+
+  final List<_CourseEntry> _courses = [_CourseEntry(), _CourseEntry(), _CourseEntry()];
   double? _gpa;
+  List<Map<String, dynamic>> _history = [];
+  bool _loadingHistory = true;
+  final _semesterCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  @override
+  void dispose() {
+    _semesterCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() => _loadingHistory = true);
+    try {
+      final data = await DatabaseService.getGpaRecords();
+      setState(() {
+        _history = data;
+        _loadingHistory = false;
+      });
+    } catch (_) {
+      setState(() => _loadingHistory = false);
+    }
+  }
 
   void _addCourse() {
     if (_courses.length < 10) {
@@ -35,22 +66,16 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
   void _calculate() {
     double totalPoints = 0;
     int totalCredits = 0;
-    bool hasEmpty = false;
 
     for (final c in _courses) {
       if (c.name.isEmpty || c.grade == null || c.credits == null) {
-        hasEmpty = true;
-        break;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill in all fields'), backgroundColor: NabihTheme.error),
+        );
+        return;
       }
       totalCredits += c.credits!;
-      totalPoints += DemoData.gradePoints[c.grade!]! * c.credits!;
-    }
-
-    if (hasEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields'), backgroundColor: NabihTheme.error),
-      );
-      return;
+      totalPoints += gradePoints[c.grade!]! * c.credits!;
     }
 
     setState(() {
@@ -63,7 +88,51 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
       _courses.clear();
       _courses.addAll([_CourseEntry(), _CourseEntry(), _CourseEntry()]);
       _gpa = null;
+      _semesterCtrl.clear();
     });
+  }
+
+  Future<void> _saveGpa() async {
+    if (_gpa == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Calculate GPA first'), backgroundColor: NabihTheme.error),
+      );
+      return;
+    }
+
+    final semester = _semesterCtrl.text.trim();
+    if (semester.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a semester label (e.g. Fall 2025)'), backgroundColor: NabihTheme.error),
+      );
+      return;
+    }
+
+    int totalCredits = 0;
+    final coursesList = <Map<String, dynamic>>[];
+    for (final c in _courses) {
+      if (c.credits != null && c.grade != null) {
+        totalCredits += c.credits!;
+        coursesList.add({'name': c.name, 'grade': c.grade, 'credits': c.credits});
+      }
+    }
+
+    try {
+      await DatabaseService.saveGpaRecord(
+        semester: semester,
+        courses: coursesList,
+        gpa: _gpa!,
+        totalCredits: totalCredits,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GPA record saved!'), backgroundColor: NabihTheme.success),
+      );
+      _loadHistory();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save: $e'), backgroundColor: NabihTheme.error),
+      );
+    }
   }
 
   Color _gpaColor(double gpa) {
@@ -112,6 +181,11 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  TextField(
+                    controller: _semesterCtrl,
+                    decoration: const InputDecoration(labelText: 'Semester (e.g. Fall 2025)', prefixIcon: Icon(Icons.calendar_today)),
+                  ),
+                  const SizedBox(height: 16),
                   ...List.generate(_courses.length, (i) => _courseRow(i)),
                   const SizedBox(height: 12),
                   if (_courses.length < 10)
@@ -121,7 +195,21 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                       label: const Text('Add Course'),
                     ),
                   const SizedBox(height: 16),
-                  if (_gpa != null) _gpaResult(),
+                  if (_gpa != null) ...[
+                    _gpaResult(),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _saveGpa,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save GPA Record'),
+                        style: ElevatedButton.styleFrom(backgroundColor: NabihTheme.success),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _gpaHistorySection(),
                 ],
               ),
             ),
@@ -192,7 +280,7 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
-                    items: DemoData.creditOptions.map((c) => DropdownMenuItem(value: c, child: Text('$c hr'))).toList(),
+                    items: creditOptions.map((c) => DropdownMenuItem(value: c, child: Text('$c hr'))).toList(),
                     onChanged: (v) => setState(() { course.credits = v; _gpa = null; }),
                     style: const TextStyle(fontSize: 14, color: NabihTheme.textPrimary),
                   ),
@@ -206,7 +294,7 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
-                    items: DemoData.gradeOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                    items: gradeOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
                     onChanged: (v) => setState(() { course.grade = v; _gpa = null; }),
                     style: const TextStyle(fontSize: 14, color: NabihTheme.textPrimary),
                   ),
@@ -227,7 +315,7 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
     for (final c in _courses) {
       if (c.credits != null && c.grade != null) {
         totalCredits += c.credits!;
-        totalPoints += DemoData.gradePoints[c.grade!]! * c.credits!;
+        totalPoints += gradePoints[c.grade!]! * c.credits!;
       }
     }
 
@@ -256,6 +344,37 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _gpaHistorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('GPA History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        if (_loadingHistory)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+        else if (_history.isEmpty)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('No saved records yet', style: TextStyle(color: NabihTheme.textSecondary))))
+        else
+          ..._history.map((record) {
+            final gpa = (record['gpa'] as num?)?.toDouble() ?? 0.0;
+            final color = _gpaColor(gpa);
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: color.withValues(alpha: 0.15),
+                  child: Text(gpa.toStringAsFixed(1), style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+                ),
+                title: Text(record['semester'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text('${record['total_credits'] ?? 0} credits  -  ${_gpaLabel(gpa)}', style: const TextStyle(fontSize: 12)),
+                trailing: Text(_gpaLabel(gpa), style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+              ),
+            );
+          }),
+      ],
     );
   }
 }
