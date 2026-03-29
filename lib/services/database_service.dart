@@ -5,8 +5,28 @@ import 'auth_service.dart';
 class DatabaseService {
   static SupabaseClient get _client => SupabaseService.client;
 
-  // ── EVENTS ──
+  /// Send a notification (for OTP, announcements, etc)
+  static Future<void> sendNotification({
+    required String title,
+    required String message,
+    required String senderName,
+    required String type,
+    String? targetEmail,
+    String? targetRole,
+  }) async {
+    final data = {
+      'title': title,
+      'message': message,
+      'sender_name': senderName,
+      'type': type,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    if (targetEmail != null) data['target_email'] = targetEmail;
+    if (targetRole != null) data['target_role'] = targetRole;
+    await _client.from('notifications').insert(data);
+  }
 
+  // ── EVENTS ──
   static Future<List<Map<String, dynamic>>> getEvents() async {
     final response = await _client
         .from('events')
@@ -42,7 +62,6 @@ class DatabaseService {
   }
 
   // ── ANNOUNCEMENTS ──
-
   static Future<List<Map<String, dynamic>>> getAnnouncements() async {
     final response = await _client
         .from('announcements')
@@ -70,7 +89,6 @@ class DatabaseService {
   }
 
   // ── SCHEDULES ──
-
   static Future<List<Map<String, dynamic>>> getSchedule() async {
     if (AuthService.userId == null) return [];
     final response = await _client
@@ -110,7 +128,6 @@ class DatabaseService {
   }
 
   // ── NOTIFICATIONS ──
-
   static Future<List<Map<String, dynamic>>> getNotifications() async {
     final response = await _client
         .from('notifications')
@@ -133,45 +150,23 @@ class DatabaseService {
   static Future<void> markNotificationRead(String notificationId) async {
     if (AuthService.userId == null) return;
     await _client.from('notification_reads').upsert({
-      'notification_id': notificationId,
       'user_id': AuthService.userId,
+      'notification_id': notificationId,
     });
   }
 
   static Future<void> markAllNotificationsRead() async {
     if (AuthService.userId == null) return;
     final notifications = await getNotifications();
-    final readIds = await getReadNotificationIds();
     for (final n in notifications) {
-      final id = n['id'] as String;
-      if (!readIds.contains(id)) {
-        await _client.from('notification_reads').insert({
-          'notification_id': id,
-          'user_id': AuthService.userId,
-        });
-      }
+      await _client.from('notification_reads').upsert({
+        'user_id': AuthService.userId,
+        'notification_id': n['id'],
+      });
     }
   }
 
-  static Future<void> sendNotification({
-    required String title,
-    required String message,
-    required String senderName,
-    required String type,
-    String? targetRole,
-  }) async {
-    await _client.from('notifications').insert({
-      'title': title,
-      'message': message,
-      'sender_id': AuthService.userId,
-      'sender_name': senderName,
-      'type': type,
-      'target_role': targetRole,
-    });
-  }
-
   // ── GPA RECORDS ──
-
   static Future<List<Map<String, dynamic>>> getGpaRecords() async {
     if (AuthService.userId == null) return [];
     final response = await _client

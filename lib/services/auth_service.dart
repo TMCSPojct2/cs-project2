@@ -1,7 +1,21 @@
+
+import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 class AuthService {
+  /// Helper to check if user is guest by email (not .edu domain)
+  static bool isGuest(String email) {
+    final lower = email.toLowerCase();
+    return !lower.endsWith('@uqu.edu.sa');
+  }
+
+  /// Generate a 6-digit OTP
+  static String generateOtp() {
+    final rand = Random.secure();
+    return List.generate(6, (_) => rand.nextInt(10)).join();
+  }
+
   static SupabaseClient get _client => SupabaseService.client;
   static GoTrueClient get _auth => _client.auth;
 
@@ -9,31 +23,56 @@ class AuthService {
   static bool get isLoggedIn => currentUser != null;
   static String? get userId => currentUser?.id;
 
-  /// Sign up with email + password. Sends confirmation email with OTP.
-  static Future<AuthResponse> signUp({
-    required String email,
-    required String password,
-    required String name,
-    String? phone,
-  }) async {
-    return await _auth.signUp(
+  /// Step 1: Send real OTP email to any address via Supabase magic-link OTP.
+  static Future<void> sendOtp({required String email}) async {
+    await _auth.signInWithOtp(
       email: email,
-      password: password,
-      data: {'name': name, 'phone': phone},
+      shouldCreateUser: true,
+      emailRedirectTo: null,
     );
   }
 
-  /// Verify OTP code from email (signup confirmation)
-  static Future<AuthResponse> verifyOTP({
+  /// Step 2: Verify OTP, set password, upsert profile.
+  static Future<void> completeRegistration({
     required String email,
     required String token,
-    required OtpType type,
+    required String password,
+    required String name,
+    String? phone,
+    String? roleOverride,
   }) async {
-    return await _auth.verifyOTP(
+    // Verify the OTP — logs the user in
+    await _auth.verifyOTP(
       email: email,
       token: token,
-      type: type,
+      type: OtpType.email,
     );
+
+    await _auth.updateUser(
+      UserAttributes(
+        password: password,
+        data: {'name': name, if (phone != null) 'phone': phone},
+      ),
+    );
+
+    final uid = _auth.currentUser?.id;
+    if (uid != null) {
+      final role = roleOverride ?? _roleFromEmailStatic(email);
+      await _client.from('profiles').upsert({
+        'id': uid,
+        'name': name,
+        'email': email,
+        'role': role,
+        if (phone != null) 'phone': phone,
+      }, onConflict: 'id');
+    }
+  }
+
+  static String _roleFromEmailStatic(String email) {
+    final lower = email.toLowerCase();
+    if (RegExp(r'^s\d+@uqu\.edu\.sa$').hasMatch(lower)) return 'student';
+    if (lower.endsWith('@uqu.edu.sa')) return 'faculty';
+    return 'visitor';
   }
 
   /// Sign in with email + password

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/local_notification_service.dart';
 import 'home_shell.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -23,13 +25,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _otpSent = false;
   String? _errorMessage;
   String? _detectedRole;
+  // 'faculty' or 'staff' — only shown when email is uqu.edu.sa non-student
+  String _uniRoleChoice = 'faculty';
+
+  // Resend OTP countdown (180 seconds = 3 minutes)
+  int _resendCountdown = 180;
+  Timer? _countdownTimer;
+
+  void _startCountdown() {
+    _resendCountdown = 180;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_resendCountdown <= 0) {
+        t.cancel();
+      } else {
+        setState(() => _resendCountdown--);
+      }
+    });
+  }
 
   String _roleFromEmail(String email) {
     final lower = email.toLowerCase();
-    if (RegExp(r'^s\d+@').hasMatch(lower)) return 'student';
-    if (lower.contains('@staff.')) return 'staff';
-    if (lower.endsWith('@uqu.edu.sa')) return 'faculty';
+    if (RegExp(r'^s\d+@uqu\.edu\.sa$').hasMatch(lower)) return 'student';
+    if (lower.endsWith('@uqu.edu.sa')) return _uniRoleChoice; // faculty or staff chosen by user
     return 'visitor';
+  }
+
+  bool _showUniRoleToggle(String email) {
+    final lower = email.toLowerCase();
+    return lower.endsWith('@uqu.edu.sa') &&
+        !RegExp(r'^s\d+@uqu\.edu\.sa$').hasMatch(lower);
   }
 
   void _detectRole(String email) {
@@ -46,21 +71,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
 
+    final email = _emailController.text.trim();
+
     try {
-      await AuthService.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isNotEmpty
-            ? _phoneController.text.trim()
-            : null,
-      );
+      // Send real Supabase OTP email to everyone
+      await AuthService.sendOtp(email: email);
 
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _otpSent = true;
       });
+      _startCountdown();
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Verification code sent to your email'),
@@ -82,6 +105,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  void _showOtpNotification(String otp) {
+    // Send OS-level notification (outside app)
+    LocalNotificationService.showOtpNotification(otp);
+
+    // Also show in-app banner as fallback
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder: (context) => _OtpBanner(
+        otp: otp,
+        onDismiss: () => entry.remove(),
+      ),
+    );
+
+    overlay.insert(entry);
+  }
+
+
   Future<void> _verifyAndRegister() async {
     final otp = _otpController.text.trim();
     if (otp.isEmpty || otp.length < 6) {
@@ -94,11 +136,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
 
+    final email = _emailController.text.trim();
+
     try {
-      await AuthService.verifyOTP(
-        email: _emailController.text.trim(),
+      await AuthService.completeRegistration(
+        email: email,
         token: otp,
-        type: OtpType.signup,
+        password: _passwordController.text,
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
+        roleOverride: _showUniRoleToggle(email) ? _uniRoleChoice : null,
       );
 
       final profile = await AuthService.getProfile();
@@ -217,8 +266,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: Text(
                               'Role is auto-assigned based on email:\n'
                               's12345@uqu.edu.sa = Student\n'
-                              'name@uqu.edu.sa = Faculty\n'
-                              'name@staff.uqu.edu.sa = Staff\n'
+                              'name@uqu.edu.sa = Faculty or Staff (your choice)\n'
                               'Other = Visitor',
                               style: TextStyle(
                                 fontSize: 11,
@@ -230,6 +278,117 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // Faculty / Staff toggle (only for @uqu.edu.sa non-student)
+                    if (_showUniRoleToggle(_emailController.text.trim()) && !_otpSent) ...
+                      [
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Are you Faculty or Staff?',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: NabihTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _uniRoleChoice = 'faculty';
+                                  _detectRole(_emailController.text.trim());
+                                }),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _uniRoleChoice == 'faculty'
+                                        ? NabihTheme.primary
+                                        : NabihTheme.primary.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: NabihTheme.primary,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.school_rounded,
+                                        size: 18,
+                                        color: _uniRoleChoice == 'faculty'
+                                            ? Colors.white
+                                            : NabihTheme.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Faculty',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: _uniRoleChoice == 'faculty'
+                                              ? Colors.white
+                                              : NabihTheme.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _uniRoleChoice = 'staff';
+                                  _detectRole(_emailController.text.trim());
+                                }),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _uniRoleChoice == 'staff'
+                                        ? NabihTheme.primary
+                                        : NabihTheme.primary.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: NabihTheme.primary,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.badge_rounded,
+                                        size: 18,
+                                        color: _uniRoleChoice == 'staff'
+                                            ? Colors.white
+                                            : NabihTheme.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Staff',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: _uniRoleChoice == 'staff'
+                                              ? Colors.white
+                                              : NabihTheme.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                     // Password field
                     TextFormField(
@@ -379,6 +538,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
+                      // Resend OTP with countdown
+                      _resendCountdown > 0
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.timer_outlined,
+                                      size: 16,
+                                      color: NabihTheme.textSecondary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Resend code in ${(_resendCountdown ~/ 60).toString().padLeft(2, '0')}:${(_resendCountdown % 60).toString().padLeft(2, '0')}',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: NabihTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : TextButton.icon(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        _isLoading = true;
+                                        _errorMessage = null;
+                                      });
+                                      try {
+                                        await AuthService.sendOtp(
+                                            email: _emailController.text
+                                                .trim());
+                                        _startCountdown();
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'New code sent to your email'),
+                                              backgroundColor:
+                                                  NabihTheme.success,
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          setState(() =>
+                                              _errorMessage = e.toString());
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(
+                                              () => _isLoading = false);
+                                        }
+                                      }
+                                    },
+                              icon: const Icon(Icons.refresh,
+                                  size: 16, color: NabihTheme.primary),
+                              label: const Text(
+                                'Resend Code',
+                                style: TextStyle(color: NabihTheme.primary),
+                              ),
+                            ),
+                      const SizedBox(height: 8),
                       TextButton(
                         onPressed: _isLoading
                             ? null
@@ -404,11 +628,132 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+}
+
+// ─── Slide-down phone-style OTP banner ───────────────────────────────────────
+class _OtpBanner extends StatefulWidget {
+  final String otp;
+  final VoidCallback onDismiss;
+  const _OtpBanner({required this.otp, required this.onDismiss});
+
+  @override
+  State<_OtpBanner> createState() => _OtpBannerState();
+}
+
+class _OtpBannerState extends State<_OtpBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _dismiss() async {
+    await _ctrl.reverse();
+    widget.onDismiss();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SlideTransition(
+        position: _slide,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: NabihTheme.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.notifications_rounded,
+                        color: NabihTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Verification Code',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Your OTP is  ${widget.otp}',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 6,
+                              color: NabihTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Enter this code to complete registration',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: NabihTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: _dismiss,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

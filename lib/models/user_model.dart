@@ -63,9 +63,9 @@ class AppUser {
   }
 
   static UserRole roleFromEmail(String email) {
-    if (RegExp(r'^s\\d+@').hasMatch(email)) return UserRole.student;
-    if (email.endsWith('@uqu.edu.sa')) return UserRole.faculty;
-    if (email.endsWith('@staff.uqu.edu.sa')) return UserRole.staff;
+    final lower = email.toLowerCase();
+    if (RegExp(r'^s\d+@uqu\.edu\.sa$').hasMatch(lower)) return UserRole.student;
+    if (lower.endsWith('@uqu.edu.sa')) return UserRole.faculty; // default; overridden at registration
     return UserRole.visitor;
   }
 }

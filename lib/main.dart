@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'services/supabase_service.dart';
+import 'services/local_notification_service.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
+  await LocalNotificationService.init();
   runApp(const NabihApp());
 }
 

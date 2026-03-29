@@ -195,7 +195,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
             const Text('NABIH v1.0.0', style: TextStyle(fontSize: 12, color: NabihTheme.textLight)),
-            const Text('Umm Al Qura University', style: TextStyle(fontSize: 12, color: NabihTheme.textLight)),
           ],
         ),
       ),

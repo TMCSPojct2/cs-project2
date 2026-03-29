@@ -149,11 +149,11 @@ DECLARE
   user_name TEXT;
 BEGIN
   -- Determine role from email
-  IF NEW.email ~ '^s[0-9]+@' THEN
+  IF NEW.email ~ '^s[0-9]+@uqu\.edu\.sa$' THEN
     user_role := 'student';
-  ELSIF NEW.email LIKE '%@staff.%' THEN
+  ELSIF NEW.email ~ '^staff\..+@uqu\.edu\.sa$' THEN
     user_role := 'staff';
-  ELSIF NEW.email LIKE '%@uqu.edu.sa' OR NEW.email LIKE '%@%.edu.sa' THEN
+  ELSIF NEW.email LIKE '%@uqu.edu.sa' THEN
     user_role := 'faculty';
   ELSE
     user_role := 'visitor';
