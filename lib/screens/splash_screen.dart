@@ -39,17 +39,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void _rebuild() => setState(() {});
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(milliseconds: 2000));
+    // Wait for animation to finish, but also at least for auth to resolve
+    final results = await Future.wait([
+      Future.delayed(const Duration(milliseconds: 1500)),
+      _resolveAuth(),
+    ]);
     if (!mounted) return;
-    if (AuthService.isLoggedIn) {
-      final profile = await AuthService.getProfile();
-      if (profile != null && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => HomeShell(profile: profile)),
-        );
-        return;
-      }
+    final profile = results[1] as dynamic;
+    if (profile != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => HomeShell(profile: profile)),
+      );
     }
+    // else: user stays on splash to tap "Get Started"
+  }
+
+  Future<dynamic> _resolveAuth() async {
+    if (!AuthService.isLoggedIn) return null;
+    return AuthService.getProfile();
   }
 
   @override
