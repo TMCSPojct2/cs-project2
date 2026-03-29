@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
-import '../services/local_notification_service.dart';
+import '../services/language_service.dart';
 import 'home_shell.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -20,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
+  final _lang = LanguageService.instance;
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _otpSent = false;
@@ -105,23 +106,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _showOtpNotification(String otp) {
-    // Send OS-level notification (outside app)
-    LocalNotificationService.showOtpNotification(otp);
-
-    // Also show in-app banner as fallback
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-
-    entry = OverlayEntry(
-      builder: (context) => _OtpBanner(
-        otp: otp,
-        onDismiss: () => entry.remove(),
-      ),
-    );
-
-    overlay.insert(entry);
-  }
 
 
   Future<void> _verifyAndRegister() async {
@@ -183,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
+      appBar: AppBar(title: Text(_lang.tr('create_account'))),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -206,9 +190,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _nameController,
                       enabled: !_otpSent,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        prefixIcon: Icon(Icons.person_outline),
+                      decoration: InputDecoration(
+                        labelText: _lang.tr('full_name'),
+                        prefixIcon: const Icon(Icons.person_outline),
                       ),
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Enter your name' : null,
@@ -222,7 +206,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
-                        labelText: 'Email',
+                        labelText: _lang.tr('email'),
                         prefixIcon: const Icon(Icons.email_outlined),
                         suffixIcon: _detectedRole != null
                             ? Padding(
@@ -397,7 +381,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: _lang.tr('password'),
                         prefixIcon: const Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -420,9 +404,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       enabled: !_otpSent,
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone (optional)',
-                        prefixIcon: Icon(Icons.phone_outlined),
+                      decoration: InputDecoration(
+                        labelText: _lang.tr('phone'),
+                        prefixIcon: const Icon(Icons.phone_outlined),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -477,7 +461,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Send Verification Code'),
+                              : Text(_lang.tr('send_otp')),
                         ),
                       )
 
@@ -514,9 +498,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         maxLength: 6,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _verifyAndRegister(),
-                        decoration: const InputDecoration(
-                          labelText: 'Enter 6-digit code',
-                          prefixIcon: Icon(Icons.security),
+                        decoration: InputDecoration(
+                          labelText: _lang.tr('otp_hint'),
+                          prefixIcon: const Icon(Icons.security),
                           counterText: '',
                         ),
                       ),
@@ -534,7 +518,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Verify & Register'),
+                              : Text(_lang.tr('verify_otp')),
                         ),
                       ),
                       const SizedBox(height: 8),

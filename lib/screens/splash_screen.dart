@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/language_service.dart';
 import 'login_screen.dart';
 import 'home_shell.dart';
 
@@ -15,6 +16,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _fadeIn;
   late Animation<double> _slideUp;
+  final _lang = LanguageService.instance;
 
   @override
   void initState() {
@@ -30,8 +32,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _controller, curve: const Interval(0.2, 0.8, curve: Curves.easeOut)),
     );
     _controller.forward();
+    _lang.addListener(_rebuild);
     _checkAuth();
   }
+
+  void _rebuild() => setState(() {});
 
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(milliseconds: 2000));
@@ -49,12 +54,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _lang.removeListener(_rebuild);
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final tr = _lang.tr;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -62,11 +70,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              NabihTheme.primaryDark,
-              NabihTheme.primary,
-              NabihTheme.primaryLight,
-            ],
+            colors: [NabihTheme.primaryDark, NabihTheme.primary, NabihTheme.primaryLight],
           ),
         ),
         child: SafeArea(
@@ -75,89 +79,76 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             builder: (context, child) {
               return Opacity(
                 opacity: _fadeIn.value,
-                child: Transform.translate(
-                  offset: Offset(0, _slideUp.value),
-                  child: child,
-                ),
+                child: Transform.translate(offset: Offset(0, _slideUp.value), child: child),
               );
             },
             child: Column(
               children: [
-                const Spacer(flex: 2),
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'N',
-                      style: TextStyle(
-                        fontSize: 64,
-                        fontWeight: FontWeight.bold,
-                        color: NabihTheme.primary,
+                // Language toggle at top-right
+                Align(
+                  alignment: _lang.isArabic ? Alignment.topLeft : Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: GestureDetector(
+                      onTap: () => _lang.toggle(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.language, color: Colors.white, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              _lang.isArabic ? 'EN' : 'عربي',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'NABIH',
-                  style: TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.bold,
+                const Spacer(flex: 2),
+                Container(
+                  width: 120, height: 120,
+                  decoration: BoxDecoration(
                     color: Colors.white,
-                    letterSpacing: 8,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 10)),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text('N', style: TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: NabihTheme.primary)),
                   ),
                 ),
+                const SizedBox(height: 24),
+                Text(tr('splash_title'),
+                    style: const TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 8)),
                 const SizedBox(height: 8),
-                const Text(
-                  'نبيه',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                  ),
-                ),
+                const Text('نبيه', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: Colors.white70)),
                 const SizedBox(height: 16),
-                Text(
-                  'Smart University Assistant',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    letterSpacing: 1.5,
-                  ),
-                ),
+                Text(tr('splash_subtitle'),
+                    style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.85), letterSpacing: 1.5)),
                 const Spacer(flex: 2),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      );
+                      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: NabihTheme.primary,
                       minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text(
-                      'Get Started',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
+                    child: Text(tr('get_started'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(height: 48),

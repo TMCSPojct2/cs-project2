@@ -1,10 +1,6 @@
--- ============================================
--- NABIH - Update Schema (Drop + Recreate)
--- Run this in Supabase SQL Editor
--- WARNING: Drops all existing tables and data
--- ============================================
 
--- Drop trigger and function first
+
+-- Drop trigger 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
 
