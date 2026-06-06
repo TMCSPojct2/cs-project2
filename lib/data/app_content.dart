@@ -57,8 +57,8 @@ List<QuickAction> get visitorActions => [
     ];
 
 List<ScheduleItem> get studentSchedule => [
-      ScheduleItem(title: LanguageController.text('Software Engineering', 'هندسة البرمجيات'), time: '08:00 - 09:20', meta: '', place: 'القاعة 205', days: LanguageController.text('Sun • Tue • Thu', 'أحد • ثلاثاء • خميس'), accent: const Color(0xFF0F5B57)),
-      ScheduleItem(title: LanguageController.text('Human Computer Interaction', 'التفاعل بين الإنسان والحاسوب'), time: '11:00 - 12:20', meta: '', place: 'القاعة 119', days: LanguageController.text('Sun • Tue', 'أحد • ثلاثاء'), accent: const Color(0xFF26476D)),
+      ScheduleItem(title: LanguageController.text('Software Engineering', 'هندسة البرمجيات'), time: '08:00 - 09:20', meta: '', place: 'القاعة 205', days: 'أحد • ثلاثاء • خميس', accent: const Color(0xFF0F5B57)),
+      ScheduleItem(title: LanguageController.text('Human Computer Interaction', 'التفاعل بين الإنسان والحاسوب'), time: '11:00 - 12:20', meta: '', place: 'القاعة 119', days: 'أحد • ثلاثاء', accent: const Color(0xFF26476D)),
     ];
 
 List<ScheduleItem> get facultySchedule => [

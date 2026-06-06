@@ -286,7 +286,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (user == null) throw const AuthException('Account could not be created.');
 
       final pin = PinService.instance.createPin();
-      await LocalNotificationService.instance.showPin(pin);
+      try { await LocalNotificationService.instance.showPin(pin); } catch (_) {}
 
       if (!mounted) return;
       Navigator.pushNamed(

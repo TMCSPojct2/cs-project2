@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/language_controller.dart';
 import '../data/role_context.dart';
-import '../services/gpa_service.dart';
-import '../services/schedule_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/common_widgets.dart';
@@ -21,7 +19,6 @@ class _GpaScreenState extends State<GpaScreen> {
     _GpaRow(course: courses[2], grade: 'B+'),
   ];
   bool _showGpa = true;
-  bool _saving = false;
 
   double get _gpa {
     final totalCredits = _rows.fold<int>(0, (sum, row) => sum + row.credits);
@@ -75,11 +72,10 @@ class _GpaScreenState extends State<GpaScreen> {
                 );
               }),
               const SizedBox(height: 6),
-              Row(children: [
-                Expanded(child: GradientButton(label: _saving ? LanguageController.text('Saving...', 'جاري الحفظ...') : LanguageController.text('Calculate & Save', 'احسب واحفظ'), compact: true, icon: Icons.calculate_outlined, onPressed: _saving ? null : _saveGpa)),
-                const SizedBox(width: 12),
-                Expanded(child: OutlinedButton(onPressed: _addCourse, child: Text(LanguageController.text('Add Course', 'إضافة مقرر')))),
-              ]),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(onPressed: _addCourse, child: Text(LanguageController.text('Add Course', 'إضافة مقرر'))),
+              ),
             ]),
           ),
           const SizedBox(height: 16),
@@ -99,34 +95,6 @@ class _GpaScreenState extends State<GpaScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _saveGpa() async {
-    setState(() => _saving = true);
-    try {
-      final role = currentUserRole(context);
-      final messenger = ScaffoldMessenger.of(context);
-      await GpaService.instance.saveGpa(
-        gpa: _gpa,
-        courses: _rows.map((row) => {'course': row.displayName, 'credits': row.credits, 'grade': row.grade}).toList(),
-      );
-      for (final row in _rows) {
-        await ScheduleService.instance.addItem(
-          role: role,
-          title: row.displayName,
-          timeRange: LanguageController.text('Time not set', 'لم يتم تحديد الوقت'),
-          meta: LanguageController.text('GPA entry', 'إدخال المعدل'),
-          location: LanguageController.text('Location not set', 'لم يتم تحديد الموقع'),
-        );
-      }
-      if (!mounted) return;
-      setState(() => _saving = false);
-      messenger.showSnackBar(SnackBar(content: Text(LanguageController.text('GPA saved and courses added to schedule', 'تم حفظ المعدل وإضافة المقررات للجدول'))));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LanguageController.text('Unable to save GPA now.', 'تعذر حفظ المعدل الآن.'))));
-    }
   }
 
   void _addCourse() {

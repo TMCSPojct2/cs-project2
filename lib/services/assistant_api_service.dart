@@ -6,7 +6,7 @@ class AssistantApiService {
   AssistantApiService._();
 
   static final AssistantApiService instance = AssistantApiService._();
-  static final Uri _endpoint = Uri.parse('http://abo3lie.com:5000/api/chat');
+  static final Uri _endpoint = Uri.parse('https://abo3lie.com:5000/api/chat');
 
   Future<String> sendMessage({required String message, required UserRole role}) async {
     final response = await http.post(
