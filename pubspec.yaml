@@ -1,0 +1,33 @@
+name: nabih_app
+description: NABIH smart university assistant
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.12.4
+  url_launcher: ^6.3.1
+  http: ^1.2.2
+  shared_preferences: ^2.2.3
+  flutter_local_notifications: ^18.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/branding/nabih_mark.png
+    - assets/branding/onboard1.jpg
+    - assets/branding/onboard2.jpg
+    - assets/branding/onboard3.jpg
