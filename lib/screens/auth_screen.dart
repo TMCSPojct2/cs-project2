@@ -355,7 +355,7 @@ class _SignUpTabState extends State<_SignUpTab> {
       if (user == null) throw const AuthException('تعذّر إنشاء الحساب.');
 
       final pin = PinService.instance.createPin();
-      await LocalNotificationService.instance.showPin(pin);
+      try { await LocalNotificationService.instance.showPin(pin); } catch (_) {}
       if (!mounted) return;
 
       Navigator.pushNamed(context, '/verify-email',

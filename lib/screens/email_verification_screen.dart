@@ -132,11 +132,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     setState(() { _resending = true; _error = null; _attempts = 0; });
     try {
       final pin = PinService.instance.createPin();
-      await LocalNotificationService.instance.showPin(pin);
+      try { await LocalNotificationService.instance.showPin(pin); } catch (_) {}
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).codeSent)),
-      );
       _clearBoxes();
     } catch (_) {
       if (mounted) setState(() => _error = l10n(context).somethingWrong);
@@ -192,7 +189,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               SurfaceCard(
                 child: Column(children: [
 
-                  // Email hint banner
+                  // PIN display banner
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -201,7 +198,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       border: Border.all(color: AppColors.primary.withValues(alpha: .3)),
                     ),
                     child: Row(children: [
-                      const Icon(Icons.mail_outline_rounded, color: AppColors.primary),
+                      const Icon(Icons.notifications_outlined, color: AppColors.primary),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
