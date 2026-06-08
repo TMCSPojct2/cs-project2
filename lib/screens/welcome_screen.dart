@@ -214,15 +214,13 @@ class _OnboardPageView extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(28, 0, 28, 0),
                     child: Directionality(
-                      textDirection: TextDirection.ltr,
+                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             isAr ? page.titleAr : page.titleEn,
-                            textAlign: TextAlign.right,
-                            textDirection: TextDirection.rtl,
                             style: const TextStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
@@ -233,8 +231,6 @@ class _OnboardPageView extends StatelessWidget {
                           const SizedBox(height: 12),
                           Text(
                             isAr ? page.bodyAr : page.bodyEn,
-                            textAlign: TextAlign.right,
-                            textDirection: TextDirection.rtl,
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.6,

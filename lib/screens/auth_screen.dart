@@ -47,11 +47,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               // ── header ────────────────────────────────────────────
               Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF152B44), Color(0xFF26476D)],
-                  ),
+                  color: Color(0xFF152B44),
                 ),
                 child: SafeArea(
                   bottom: false,
@@ -89,12 +85,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                           Container(
                             width: 44, height: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .12),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Center(
-                              child: Text('N', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: Image.asset('assets/branding/nabih_mark.png', fit: BoxFit.contain),
                           ),
                           const SizedBox(width: 12),
                           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -129,7 +124,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                             ],
                           ),
                         ),
-                        const SizedBox(height: 0),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),

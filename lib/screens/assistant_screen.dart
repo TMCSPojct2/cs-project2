@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/assistant_content.dart';
 import '../data/language_controller.dart';
@@ -35,7 +36,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final suggestions = assistantSuggestionsForRole(role);
 
     return AppScaffold(
-      bottomNavigationBar: RoleBottomNav(currentIndex: -1, items: NavItems.forRole(role), role: role),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
         child: Column(
@@ -44,31 +44,33 @@ class _AssistantScreenState extends State<AssistantScreen> {
               subtitle: LanguageController.text('${role.label} assistant', 'مساعد ${role.label}'),
               trailing: IconButton(onPressed: () => smartBack(context, currentUserRole(context)), icon: const Icon(Icons.arrow_back_rounded)),
             ),
-            const SizedBox(height: 18),
-            SurfaceCard(
-              padding: const EdgeInsets.all(20),
-              gradient: const LinearGradient(colors: [Color(0xFF152B44), Color(0xFF26476D), Color(0xFF315E8E)]),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(18)),
-                        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
-                      ),
-                      const SizedBox(width: 14),
-                      Text(LanguageController.text('NABIH Assistant', 'مساعد NABIH'), style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(_assistantRoleDescription(role), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: .78))),
-                ],
+            if (_messages.isEmpty) ...[
+              const SizedBox(height: 18),
+              SurfaceCard(
+                padding: const EdgeInsets.all(20),
+                gradient: const LinearGradient(colors: [Color(0xFF152B44), Color(0xFF26476D), Color(0xFF315E8E)]),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(18)),
+                          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+                        ),
+                        const SizedBox(width: 14),
+                        Text(LanguageController.text('NABIH Assistant', 'مساعد NABIH'), style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(_assistantRoleDescription(role), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: .78))),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
+            ],
             Expanded(
               child: SurfaceCard(
                 padding: EdgeInsets.zero,
@@ -104,21 +106,25 @@ class _AssistantScreenState extends State<AssistantScreen> {
       );
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-      itemCount: _messages.length + (_isTyping ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (_isTyping && index == _messages.length) {
-          return const _TypingBubble();
-        }
-        return _MessageBubble(
-          message: _messages[index],
-          role: role,
-          onAction: (action) => Navigator.pushNamed(context, action.route, arguments: role),
-          onRegenerate: _messages[index].canRegenerate && _lastPrompt != null ? () { _regenerate(role); } : null,
-        );
-      },
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+        itemCount: _messages.length + (_isTyping ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (_isTyping && index == _messages.length) {
+            return const _TypingBubble();
+          }
+          return _MessageBubble(
+            key: ValueKey(index),
+            message: _messages[index],
+            role: role,
+            onAction: (action) => Navigator.pushNamed(context, action.route, arguments: role),
+            onRegenerate: _messages[index].canRegenerate && _lastPrompt != null ? () { _regenerate(role); } : null,
+          );
+        },
+      ),
     );
   }
 
@@ -289,6 +295,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onRegenerate;
 
   const _MessageBubble({
+    super.key,
     required this.message,
     required this.role,
     required this.onAction,
@@ -301,7 +308,7 @@ class _MessageBubble extends StatelessWidget {
     final bubbleColor = isUser ? AppColors.primary : AppColors.mist;
     final textColor = isUser ? Colors.white : AppColors.ink;
 
-    return Align(
+    final bubble = Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         width: MediaQuery.of(context).size.width * .76,
@@ -322,7 +329,15 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 border: isUser ? null : Border.all(color: AppColors.line),
               ),
-              child: Text(LanguageController.translateRaw(message.text), style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: textColor)),
+              child: Directionality(
+                textDirection: LanguageController.direction,
+                child: isUser
+                    ? Text(LanguageController.translateRaw(message.text), style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: textColor))
+                    : _TypewriterText(
+                        text: LanguageController.translateRaw(message.text),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: textColor),
+                      ),
+              ),
             ),
             if (!isUser && (message.actions.isNotEmpty || onRegenerate != null)) ...[
               const SizedBox(height: 8),
@@ -340,6 +355,8 @@ class _MessageBubble extends StatelessWidget {
         ),
       ),
     );
+
+    return bubble;
   }
 }
 
@@ -582,6 +599,50 @@ class _SmallActionChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TypewriterText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+
+  const _TypewriterText({required this.text, this.style});
+
+  @override
+  State<_TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<_TypewriterText> with SingleTickerProviderStateMixin {
+  AnimationController? _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final len = widget.text.length;
+    if (len == 0) return;
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: len * 29),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = _ctrl;
+    if (ctrl == null) return Text(widget.text, style: widget.style);
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (_, __) {
+        final count = (ctrl.value * widget.text.length).round().clamp(0, widget.text.length);
+        return Text(widget.text.substring(0, count), style: widget.style);
+      },
     );
   }
 }
