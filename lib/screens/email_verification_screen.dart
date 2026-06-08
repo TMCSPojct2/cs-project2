@@ -132,7 +132,35 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     setState(() { _resending = true; _error = null; _attempts = 0; });
     try {
       final pin = PinService.instance.createPin();
-      try { await LocalNotificationService.instance.showPin(pin); } catch (_) {}
+      bool notified = false;
+      try { notified = await LocalNotificationService.instance.showPin(pin); } catch (_) {}
+      if (!mounted) return;
+      if (!notified) {
+        final t = l10n(context);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            title: Text(t.otpHero),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(LanguageController.text('Enter this code on the next screen:', 'أدخل هذا الرمز في الشاشة التالية:')),
+                const SizedBox(height: 16),
+                Text(pin, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 10)),
+                const SizedBox(height: 8),
+                Text(LanguageController.text('Valid for 15 minutes.', 'صالح لمدة 15 دقيقة.'), style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(LanguageController.text('Got it', 'حسنًا')),
+              ),
+            ],
+          ),
+        );
+      }
       if (!mounted) return;
       _clearBoxes();
     } catch (_) {

@@ -9,14 +9,16 @@ class LocalNotificationService {
     await html.Notification.requestPermission();
   }
 
-  Future<void> showPin(String pin) async {
+  Future<bool> showPin(String pin) async {
     final perm = await html.Notification.requestPermission();
     if (perm == 'granted') {
       html.Notification(
         'NABIH – رمز التحقق',
         body: 'رمزك: $pin  •  Your code: $pin',
       );
+      return true;
     }
+    return false;
   }
 
   Future<void> cancelPin() async {}

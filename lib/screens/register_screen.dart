@@ -286,7 +286,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (user == null) throw const AuthException('Account could not be created.');
 
       final pin = PinService.instance.createPin();
-      try { await LocalNotificationService.instance.showPin(pin); } catch (_) {}
+      bool notified = false;
+      try { notified = await LocalNotificationService.instance.showPin(pin); } catch (_) {}
+
+      if (!mounted) return;
+      if (!notified) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            title: Text(LanguageController.text('Your Verification Code', 'رمز التحقق الخاص بك')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(LanguageController.text('Enter this code on the next screen:', 'أدخل هذا الرمز في الشاشة التالية:')),
+                const SizedBox(height: 16),
+                Text(
+                  pin,
+                  style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 10),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  LanguageController.text('Valid for 15 minutes.', 'صالح لمدة 15 دقيقة.'),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(LanguageController.text('Got it', 'حسنًا')),
+              ),
+            ],
+          ),
+        );
+      }
 
       if (!mounted) return;
       Navigator.pushNamed(

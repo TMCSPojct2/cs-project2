@@ -26,7 +26,7 @@ class LocalNotificationService {
     _ready = true;
   }
 
-  Future<void> showPin(String pin) async {
+  Future<bool> showPin(String pin) async {
     try { await init(); } catch (_) {}
     const androidDetails = AndroidNotificationDetails(
       'nabih_otp',
@@ -46,6 +46,7 @@ class LocalNotificationService {
       'رمزك: $pin  •  Your code: $pin',
       details,
     );
+    return true;
   }
 
   Future<void> cancelPin() async {
