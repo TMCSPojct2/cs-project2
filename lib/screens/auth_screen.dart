@@ -41,7 +41,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       builder: (_, isAr, __) {
         return Scaffold(
           backgroundColor: AppColors.background,
-          resizeToAvoidBottomInset: false,
+          resizeToAvoidBottomInset: true,
           body: Column(
             children: [
               // ── header ────────────────────────────────────────────
